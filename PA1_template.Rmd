@@ -1,0 +1,164 @@
+---
+title: "Reading Activity Data"
+author: "Charles Westby"
+date: "11/13/2017"
+output: html_document
+---
+
+#Reading Activity Data 
+
+##Loading and Processing Data
+Here is where I imported and processed the data.
+  
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#loading packages
+library(dplyr) 
+library(ggplot2)
+
+#importing the data
+url <- download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", destfile = "ActivityData.zip")
+file <- unzip("ActivityData.zip")
+Activity_Data <- read.csv("activity.csv")
+
+#Making the Date column into a Date class for analysis
+Activity_Data$date <- as.Date(Activity_Data$date)
+
+```
+
+
+##Finding Mean Total Number of Steps Per Day
+Here is where I performed the analysis. First I found the total number of steps per day
+
+```{r echo=TRUE}
+# Finding the total number of steps per day
+Total_Steps <- Activity_Data %>%
+  group_by(date) %>% #grouping data
+  summarize(total_steps = sum(steps)) #finding total sum each day
+Total_Steps
+```
+
+Then I plotted a histogram of the range for steps each day
+
+```{r echo=TRUE}
+ggplot(Total_Steps, aes(x = total_steps)) +
+  geom_histogram(fill = "blue") +
+  labs(x = "Steps", title = "Total Steps Per Day")
+```
+
+Then I found the mean and median of the total number of steps per day
+
+```{r echo=TRUE}
+steps_mean <- mean(Total_Steps$total_steps, na.rm = TRUE)
+steps_mean
+steps_median <- median(Total_Steps$total_steps, na.rm = TRUE)
+steps_median
+```
+
+So on each day the mean for steps in a day was `steps_mean` and a median for steps in a day was `steps_median`
+
+##Average Daily Activity Pattern
+Here I found how many steps on average were take for each 5 minute interval in the day.
+```{r echo = TRUE}
+Average_Daily <- Activity_Data %>%
+  group_by(interval) %>% #grouping data by interval
+  summarize(steps_avg = mean(steps, na.rm = TRUE)) #finding daily mean
+Average_Daily
+```
+ 
+Next I plotted a time series plot of the average steps taken at every 5 minute interval
+```{r echo=TRUE}
+ggplot(Average_Daily, aes(x = interval, y = steps_avg)) +
+  geom_line() +
+  labs(x = "Interval", y = "Average Steps", 
+       title = "Average Steps Per Interval")
+```
+
+Then I found which interval had the maximum number of steps per day
+```{r echo=TRUE}
+#Finding the interval with the highest number of steps on average
+max <- Average_Daily[which.max(Average_Daily$steps_avg), ]
+max
+```
+
+The graph and the previous code show that the interval that has the maximum number of steps is `max`
+
+##Imputing Missing Values
+First I found the total number of missing values or (NA's) in the dataset
+
+```{r echo=TRUE}
+total_na <- sum(is.na(Activity_Data$steps)) #finding missing values
+total_na
+```
+
+The total number of missing values is `total_na`. So I decided to create a new dataset and impute the missing values with the median steps per interval. 
+
+```{r echo=TRUE}
+Activity_Data_2 <- Activity_Data #creating second dataset
+ind <- which(is.na(Activity_Data_2$steps)) #finding missing values
+Activity_Data_2[ind, "steps"] <- median(Average_Daily$steps_avg) #subbing median steps per interval
+```
+
+##New Average Daily Pattern
+Next I calculated the total steps for each day in the new dataset. Then I created a histogram showing the total number of steps per day. 
+
+```{r echo = TRUE}
+Total_Steps_2 <- Activity_Data_2 %>%
+  group_by(date) %>%
+  summarize(total_steps = sum(steps))
+
+ggplot(Total_Steps_2, aes(x = total_steps)) +
+  geom_histogram(fill = "red") +
+  labs(x = "Steps", title = "Total Steps Per Day")
+```
+
+I also found the new mean and the new median for imputed dataset
+```{r echo=TRUE}
+steps_mean <- mean(Total_Steps_2$total_steps, na.rm = TRUE)
+steps_mean
+steps_median <- median(Total_Steps_2$total_steps, na.rm = TRUE)
+steps_median
+```
+
+After imputing the data with the median of steps per interval, there's a large increase in the number that was used to impute the data. This increase is obvious when comparing the histograms of the Total Steps Per Day for the two datasets. The change in the mean was about 100 steps per day. The change in the median was about 300 steps per day. Further analysis will show what other effects this change has on the datasets.
+
+##Difference Between Weekday and Weekend Activity Patterns
+Here I added a column called Weekdays and created two vectors that I used to subset the data. Next I created two datasets based on Weekdays and Weekends. Then for each one I found the mean steps per interval.
+```{r}
+#Adding a new column called Weekdays
+Activity_Data_2_Days <- Activity_Data_2 %>%
+  mutate(Weekday = weekdays(Activity_Data_2$date)) 
+
+#Forming vector for Weekdays and one for Weekends
+Weekdays <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+Weekends <- c("Saturday", "Sunday")
+
+#Forming Weekday Data Set
+Weekday_Activity <- Activity_Data_2_Days %>%
+  filter(Weekday %in% Weekdays)
+
+#Finding the mean of steps per interval on weekdays
+Average_Daily_weekday <- Weekday_Activity %>%
+  group_by(interval) %>%
+  summarize(steps_avg = mean(steps, na.rm = TRUE))
+
+#Forming Weekend Dataset
+Weekend_Activity <- Activity_Data_2_Days %>%
+  filter(Weekday %in% Weekends)
+
+#Finding mean of steps per inerval on weekends
+Average_Daily_weekend <- Weekend_Activity %>%
+  group_by(interval) %>%
+  summarize(steps_avg = mean(steps, na.rm = TRUE))
+```
+
+##Plot of Intervals Per Step on Weekdays and Weekends
+Finally I put two time series plots, side by side, containing the steps taken per interval on weekdays and weekends.
+```{r echo = TRUE}
+par(mfrow = c(1, 2))
+plot(Average_Daily_weekday$interval, Average_Daily_weekday$steps_avg,
+     type = "l", xlab = "Interval", ylab = "Average Steps", 
+     main = "Weekday Average Steps")
+plot(Average_Daily_weekend$interval, Average_Daily_weekend$steps_avg,
+     type = "l", xlab = "Inverval", ylab = "Average Steps",
+     main = "Weekend Average Steps")
+```
